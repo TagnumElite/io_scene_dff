@@ -1,7 +1,7 @@
 bl_info = {
     "name": "RenderWare importer/exporter for GTA III/VC/SA (.dff)",
-    "author": "Ago Allikmaa (maxorator), Pedro Luis Valadés Viera (PerikiyoXD)",
-    "version": (0, 10, 0),
+    "author": "Ago Allikmaa (maxorator), Pedro Luis Valadés Viera (PerikiyoXD), Tagan Hoyle (TagnumElite)",
+    "version": (1, 0, 0),
     "blender": (2, 6, 3),
     "location": "File > Import-Export > Renderware (.dff) ",
     "description": "RenderWare importer/exporter for GTA III/VC/SA",
@@ -47,6 +47,7 @@ class RwTypes():
     MATREFLECTION = 0x253F2FC
     MESHEXTENSION = 0x253F2FD
     
+    @staticmethod
     def decodeVersion(version):
         if (version & 0xFFFF0000) == 0:
             print("Version: "+str(hex(version << 8)))
@@ -296,7 +297,7 @@ class ImportRenderware:
             #On this cases, we'll let the material generate it's name.
         
             if (self.texture is None):
-                self.name = "notextured_" + str(self.col[0]) + "." + str(self.col[1]) + "." + str(self.col[2]) + "." + str(self.col[3])
+                self.name = "nottextured_" + str(self.col[0]) + "." + str(self.col[1]) + "." + str(self.col[2]) + "." + str(self.col[3])
             else:
                 #We set material's name to the texture name.
                 self.name = self.texture.name
@@ -427,6 +428,11 @@ class ImportRenderware:
         self.geoms = []
         
         self.f = open(filename, "rb")
+        header = self.readFormat("III")
+        self.f.seek(0);
+        # Interiors has an UV Animation Dictioanry, SKIP!
+        if header[0] == 43:
+            self.f.seek(header[1]+12, 1);
         self.readSection(RwTypes.CLUMP)
         self.f.close()
         
@@ -454,7 +460,7 @@ class ImportRenderware:
         header = (header[0], header[1], RwTypes.decodeVersion(header[2]))
                 
         if type >= 0 and header[0] != type:
-            raise Exception("Expected type " + str(type) + ", found " + str(header[0]))
+            raise Exception("Expected type " + str(type) + ", found " + str(header[0]) + " at pos " + str(self.f.tell()))
             
         curPos = self.f.tell()
         
@@ -669,6 +675,14 @@ class ImportRenderware:
         
         for i in range(atomicCount):
             self.readSection(RwTypes.ATOMIC)
+        
+        if metaHeader[2] > 0x33000:
+            for i in range(lightCount):
+                #I don't Think we need to lights, skip!
+                struct_header = self.readFormat("III")
+                self.f.seek(struct_header[1], 1);
+                light_header = self.readFormat("III")
+                self.f.seek(light_header[1], 1);
             
         self.readSection(RwTypes.EXTENSION)
         
